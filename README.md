@@ -44,12 +44,11 @@ Do not use exFAT. The stock daemon explicitly ignores exFAT SD media.
 2. The device will show the stock upgrading screen. This is expected.
 3. The payload renames `loong_upgrade` to `loong_upgrade.used` on the SD card.
 4. In `keeper` mode, it installs:
-5. Make sure your compuer is connected to the top USB-C port
 ```text
 /usr/bin/adb-keeper.sh
 /etc/init.d/S99adb-keeper
 ```
-
+5. Make sure your computer is connected to the top USB-C port
 6. While the upgrade screen is still visible, test:
 
 ```sh
