@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+.DS_Store
+
+# Generated SD-card payload directories.
+adb_unlock_sd/
+adb_keeper_sd/
+loong_probe_sd/
+
