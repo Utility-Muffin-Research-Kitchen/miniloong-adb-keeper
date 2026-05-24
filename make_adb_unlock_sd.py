@@ -25,130 +25,25 @@ PROBE_ONLY_COMMAND = (
     "while true; do sleep 3600; done"
 )
 ADB_ENABLE_COMMAND = (
-    "LOG=/userdata/adb_unlock_probe.log; "
-    "SDLOG=/mnt/sdcard/adb_unlock_probe.log; "
+    "LOG=/userdata/adb_unlock.log; "
+    "SDLOG=/mnt/sdcard/adb_unlock.log; "
     "printf 'adb unlock command started\\n' >$LOG 2>/dev/null || true; "
     "printf 'adb unlock command started\\n' >$SDLOG 2>/dev/null || true; "
-    "touch /userdata/adb_unlock_command_started 2>/dev/null || true; "
-    "touch /mnt/sdcard/adb_unlock_command_started 2>/dev/null || true; "
     "mv /mnt/sdcard/loong_upgrade /mnt/sdcard/loong_upgrade.used 2>/dev/null || true; "
-    "printf 'renamed trigger if writable\\n' >>$LOG 2>/dev/null || true; "
-    "printf 'renamed trigger if writable\\n' >>$SDLOG 2>/dev/null || true; "
-    "rm -f /tmp/.usb_config /etc/.usb_config; "
+    # Make sure file is mutable in case a prior install set it.
+    "chattr -i /etc/.usb_config 2>/dev/null || true; "
     "echo usb_adb_en >/etc/.usb_config; "
-    "printf 'wrote /etc/.usb_config\\n' >>$LOG 2>/dev/null || true; "
-    "printf 'wrote /etc/.usb_config\\n' >>$SDLOG 2>/dev/null || true; "
-    "cat /etc/.usb_config >>$LOG 2>/dev/null || true; "
-    "/etc/init.d/S50usb-gadget.sh restart >>$LOG 2>&1 & "
-    "printf 'spawned usb gadget restart\\n' >>$LOG 2>/dev/null || true; "
-    "printf 'spawned usb gadget restart\\n' >>$SDLOG 2>/dev/null || true; "
-    "touch /userdata/adb_unlock_restart_spawned 2>/dev/null || true; "
-    "touch /mnt/sdcard/adb_unlock_restart_spawned 2>/dev/null || true; "
-    "sync; "
-    "while true; do sleep 3600; done"
-)
-KEEPER_INSTALL_COMMAND = (
-    "printf 'adb keeper otaCommand started\\n' >/mnt/sdcard/adb_keeper_install_command.log 2>/dev/null || true; "
-    "sh /mnt/sdcard/adb-keeper-install.sh >>/mnt/sdcard/adb_keeper_install_command.log 2>&1; "
-    "printf 'adb keeper installer returned\\n' >>/mnt/sdcard/adb_keeper_install_command.log 2>/dev/null || true; "
+    # Pin the gadget config so loong_storage cannot flip it to MTP.
+    "chattr +i /etc/.usb_config; "
+    "printf 'pinned /etc/.usb_config = usb_adb_en\\n' >>$LOG 2>/dev/null || true; "
+    "printf 'pinned /etc/.usb_config = usb_adb_en\\n' >>$SDLOG 2>/dev/null || true; "
     "sync; "
     "while true; do sleep 3600; done"
 )
 COMMAND_MODES = {
     "probe": PROBE_ONLY_COMMAND,
     "adb": ADB_ENABLE_COMMAND,
-    "keeper": KEEPER_INSTALL_COMMAND,
 }
-
-KEEPER_SCRIPT = """#!/bin/sh
-LOG=/userdata/adb-keeper.log
-INITIAL_DELAY=${ADB_KEEPER_INITIAL_DELAY:-45}
-INTERVAL=${ADB_KEEPER_INTERVAL:-30}
-
-mkdir -p /userdata 2>/dev/null || true
-printf '[%s] adb-keeper starting, delay=%s interval=%s\\n' "$(date '+%F %T')" "$INITIAL_DELAY" "$INTERVAL" >>"$LOG" 2>/dev/null || true
-sleep "$INITIAL_DELAY"
-
-while true; do
-    cfg="$(cat /etc/.usb_config 2>/dev/null || true)"
-    funcs="$(cat /var/run/usb-gadget/funcs 2>/dev/null || true)"
-
-    case " $funcs " in
-        *" adb "*) has_adb=1 ;;
-        *) has_adb=0 ;;
-    esac
-
-    if [ "$cfg" != "usb_adb_en" ] || [ "$has_adb" != "1" ]; then
-        printf '[%s] forcing adb cfg=%s funcs=%s\\n' "$(date '+%F %T')" "$cfg" "$funcs" >>"$LOG" 2>/dev/null || true
-        rm -f /tmp/.usb_config /etc/.usb_config
-        echo usb_adb_en >/etc/.usb_config
-        /etc/init.d/S50usb-gadget.sh restart >>"$LOG" 2>&1 &
-        touch /userdata/adb_keeper_forced 2>/dev/null || true
-    fi
-
-    sleep "$INTERVAL"
-done
-"""
-
-KEEPER_INIT_SCRIPT = """#!/bin/sh
-
-case "$1" in
-    start)
-        if [ -x /usr/bin/adb-keeper.sh ]; then
-            /usr/bin/adb-keeper.sh &
-        fi
-        ;;
-    stop)
-        killall adb-keeper.sh 2>/dev/null || true
-        ;;
-    restart|reload)
-        killall adb-keeper.sh 2>/dev/null || true
-        if [ -x /usr/bin/adb-keeper.sh ]; then
-            /usr/bin/adb-keeper.sh &
-        fi
-        ;;
-    *)
-        echo "Usage: $0 {start|stop|restart}" >&2
-        exit 1
-        ;;
-esac
-
-exit 0
-"""
-
-KEEPER_INSTALLER = f"""#!/bin/sh
-set -u
-
-LOG=/userdata/adb-keeper-install.log
-SDLOG=/mnt/sdcard/adb-keeper-install.log
-
-mkdir -p /userdata 2>/dev/null || true
-printf '[%s] installing adb keeper\\n' "$(date '+%F %T')" >"$LOG" 2>/dev/null || true
-printf '[%s] installing adb keeper\\n' "$(date '+%F %T')" >"$SDLOG" 2>/dev/null || true
-
-mv /mnt/sdcard/loong_upgrade /mnt/sdcard/loong_upgrade.used 2>/dev/null || true
-printf 'renamed loong_upgrade if writable\\n' >>"$LOG" 2>/dev/null || true
-printf 'renamed loong_upgrade if writable\\n' >>"$SDLOG" 2>/dev/null || true
-
-cat > /usr/bin/adb-keeper.sh <<'ADB_KEEPER_EOF'
-{KEEPER_SCRIPT.rstrip()}
-ADB_KEEPER_EOF
-
-cat > /etc/init.d/S99adb-keeper <<'ADB_KEEPER_INIT_EOF'
-{KEEPER_INIT_SCRIPT.rstrip()}
-ADB_KEEPER_INIT_EOF
-
-chmod 755 /usr/bin/adb-keeper.sh /etc/init.d/S99adb-keeper
-rm -f /tmp/.usb_config /etc/.usb_config
-echo usb_adb_en >/etc/.usb_config
-touch /userdata/adb_keeper_installed 2>/dev/null || true
-printf 'installed /usr/bin/adb-keeper.sh and /etc/init.d/S99adb-keeper\\n' >>"$LOG" 2>/dev/null || true
-printf 'installed /usr/bin/adb-keeper.sh and /etc/init.d/S99adb-keeper\\n' >>"$SDLOG" 2>/dev/null || true
-
-/etc/init.d/S99adb-keeper start >>"$LOG" 2>&1 || true
-/etc/init.d/S50usb-gadget.sh restart >>"$LOG" 2>&1 &
-sync
-"""
 
 MASK64 = (1 << 64) - 1
 
@@ -275,8 +170,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--mode",
         choices=sorted(COMMAND_MODES),
-        default="probe",
-        help="Payload command mode. Defaults to probe, which writes markers only.",
+        default="adb",
+        help="Payload command mode. Defaults to adb, which sets mtpDisable=1 and forces /etc/.usb_config to usb_adb_en.",
     )
     parser.add_argument(
         "--force",
@@ -332,16 +227,10 @@ def write_payload(args: argparse.Namespace) -> None:
     print(f"hash input: {hash_input}")
     print()
     print(f"mode: {args.mode if args.command is None else 'custom'}")
-    if args.command is None and args.mode == "keeper":
-        installer_path = output_dir / "adb-keeper-install.sh"
-        installer_path.write_text(KEEPER_INSTALLER, encoding="utf-8")
-        print(f"  {installer_path}")
-        print("Copy loong_upgrade, adb_probe.bin, and adb-keeper-install.sh to the SD root.")
-    else:
-        stale_installer = output_dir / "adb-keeper-install.sh"
-        if stale_installer.exists():
-            stale_installer.unlink()
-        print("Copy loong_upgrade and adb_probe.bin to the root of a FAT32 or ext4 SD card.")
+    stale_installer = output_dir / "adb-keeper-install.sh"
+    if stale_installer.exists():
+        stale_installer.unlink()
+    print("Copy loong_upgrade and adb_probe.bin to the root of a FAT32 or ext4 SD card.")
     print("Do not use exFAT; stock loong_daemon explicitly ignores exFAT SD media.")
 
 
