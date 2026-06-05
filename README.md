@@ -4,6 +4,11 @@ Tools for generating SD-card `loong_upgrade` payloads for the Miniloong Pocket 1
 
 The main use case is enabling the stock ADB daemon on a device whose GUI exposes no ADB switch. The payload pins `/etc/.usb_config` to `usb_adb_en` and sets the ext4 immutable flag (`chattr +i`) on it. The stock `loong_storage` daemon still tries to flip USB to MTP at boot, but every write attempt fails silently and the gadget stays as ADB. After one application, ADB stays up across every boot. No init scripts, no polling, no boot-time race.
 
+Leaf/Jawaka can also apply the same pin from Settings → Network once Leaf is
+already bootable. That path writes a Leaf restore marker at
+`.system/leaf/state/adb-enabled`, so the Leaf init hook repairs the pin at boot
+when the user has enabled ADB from the UI.
+
 ## What This Does
 
 `make_adb_unlock_sd.py` creates an SD-root payload:
