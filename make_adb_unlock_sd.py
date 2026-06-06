@@ -30,13 +30,20 @@ ADB_ENABLE_COMMAND = (
     "printf 'adb unlock command started\\n' >$LOG 2>/dev/null || true; "
     "printf 'adb unlock command started\\n' >$SDLOG 2>/dev/null || true; "
     "mv /mnt/sdcard/loong_upgrade /mnt/sdcard/loong_upgrade.used 2>/dev/null || true; "
+    "if mount -o remount,rw / 2>/dev/null || mount -o remount,rw /dev/root / 2>/dev/null; then "
     # Make sure file is mutable in case a prior install set it.
     "chattr -i /etc/.usb_config 2>/dev/null || true; "
-    "echo usb_adb_en >/etc/.usb_config; "
-    # Pin the gadget config so loong_storage cannot flip it to MTP.
-    "chattr +i /etc/.usb_config; "
+    "if echo usb_adb_en >/etc/.usb_config && chattr +i /etc/.usb_config; then "
     "printf 'pinned /etc/.usb_config = usb_adb_en\\n' >>$LOG 2>/dev/null || true; "
     "printf 'pinned /etc/.usb_config = usb_adb_en\\n' >>$SDLOG 2>/dev/null || true; "
+    "else "
+    "printf 'failed to pin /etc/.usb_config\\n' >>$LOG 2>/dev/null || true; "
+    "printf 'failed to pin /etc/.usb_config\\n' >>$SDLOG 2>/dev/null || true; "
+    "fi; "
+    "else "
+    "printf 'rootfs remount rw failed\\n' >>$LOG 2>/dev/null || true; "
+    "printf 'rootfs remount rw failed\\n' >>$SDLOG 2>/dev/null || true; "
+    "fi; "
     "sync; "
     "while true; do sleep 3600; done"
 )
