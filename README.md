@@ -6,7 +6,7 @@ The main use case is enabling the stock ADB daemon on a device whose GUI exposes
 
 Leaf/Jawaka can also apply the same pin from Settings > Network once Leaf is
 already bootable. That path writes a Leaf restore marker at
-`.system/leaf/platforms/mlp1/state/adb-enabled`, so the Leaf init hook repairs
+`.umrk/mlp1/adb-enabled`, so the Leaf init hook repairs
 the pin at boot when the user has enabled ADB from the UI.
 
 ## What This Does
